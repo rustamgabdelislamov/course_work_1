@@ -13,12 +13,12 @@ load_dotenv()
 API_KEY = os.getenv('API_KEY')
 API_KEY_ALPHAVANTAGE = os.getenv('API_KEY_ALPHAVANTAGE')
 
-def get_read_xlsx(path: str) -> list[dict]:
-    """Функция принимает путь к excel файлу и преобразует в список словарей"""
+
+def get_read_xlsx(path: str) -> pd.DataFrame:
+    """Функция принимает путь к excel файлу и преобразует в dataFrame"""
     try:
         df = pd.read_excel(path)
-        transactions = df.to_dict(orient='records')
-        return transactions
+        return df
     except Exception as e:
         return []
 
@@ -48,30 +48,40 @@ def determining_time_day(date_time: str) -> str:
         return 'Добрый вечер'
 
 
-def cards_and_transactions(transactions:list[dict]) -> list[dict]:
-    """Функция получения по номерам карт: сумм платежа и кэшбэка """
-    card_sums = defaultdict(int)
+def get_operations_with_range(date_end:str) -> pd.DataFrame:
+    df = get_read_xlsx('data/operations.xlsx')
+    date_start = datetime.strptime(date_end, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-01 00:00:00")
+    df["Дата операции"] = pd.to_datetime(df["Дата операции"], dayfirst=True)
+    filter_operations = df[(df["Дата операции"] >= date_start) & (df["Дата операции"] <= date_end) & (df["Статус"] == "OK")]
+    filter_operations.loc[:, "Дата операции"] = filter_operations["Дата операции"].apply(lambda x: x.strftime("%d.%m.%Y"))
+    return filter_operations
 
-    for transaction in transactions:
-        if (transaction.get('Статус') == 'OK' and isinstance(transaction['Номер карты'], str)
-                and transaction.get('Категория') != 'Пополнения'):
-            card_sums[transaction['Номер карты']] += transaction['Сумма платежа']
+
+def cards_and_transactions(df: pd.DataFrame) -> list[dict]:
+    """Функция получения по номерам карт: сумм платежа и кэшбэка с учетом фильтрации по дате"""
+    filter_operations = df[(df["Статус"] == "OK") & (df["Категория"] != "Пополнения")]
+    operation_group = filter_operations[["Номер карты", "Сумма платежа"]].groupby("Номер карты").sum().reset_index()
+    operations = operation_group.to_dict(orient='records')
 
     result_cards = []
-    for key, value in card_sums.items():
-        last_digits = key[1:]
-        total_spent = abs(value)
-        cashback = round(total_spent * 0.01, 2)
 
-        result_cards.append({
+    for operation in operations:
+        last_digits = operation.get("Номер карты")[1:]
+        total_spent = round(operation.get("Сумма платежа"), 2)
+        cashback = abs(round(total_spent * 0.01, 2))
+        result = {
             "last_digits": last_digits,
-            "total_spent": round(total_spent, 2),
+            "total_spent": total_spent,
             "cashback": cashback
-        })
+        }
+        result_cards.append(result)
+
     return result_cards
 
 
-def descriptions_and_transactions(transactions: list[dict]) -> list[dict]:
+def descriptions_and_transactions(df: pd.DataFrame) -> list[dict]:
+    filter_operations = df[df["Статус"] == "OK"]
+    transactions = filter_operations.to_dict(orient='records')
     result_descriptions = []
 
     for transaction in transactions:
@@ -138,7 +148,7 @@ def get_stock_rates(date:str) -> list[dict]:
     for data in user_data.get("user_stocks"):
         url = f"https://www.alphavantage.co/query"
         params = {
-            "function": "TIME_SERIES_DAILY",
+            "function": "GLOBAL_QUOTE",
             "symbol": data,
             "apikey": API_KEY_ALPHAVANTAGE
         }
@@ -149,10 +159,9 @@ def get_stock_rates(date:str) -> list[dict]:
             if status_code == 200:
 
                 result = response.json()
-                print(result)
                 result_dict = {
                     "stock": data,
-                    "price": result.get("Time Series (Daily)",{}).get(formatted_date,{}).get("4. close")
+                    "price": result.get("Global Quote",{}).get("05. price",{})
                 }
                 rates.append(result_dict)
             else:
