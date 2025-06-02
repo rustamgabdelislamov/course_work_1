@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import datetime, time
 
 
@@ -7,6 +6,7 @@ import os
 from dotenv import load_dotenv
 import requests
 import json
+
 
 load_dotenv()
 
@@ -49,6 +49,7 @@ def determining_time_day(date_time: str) -> str:
 
 
 def get_operations_with_range(date_end:str) -> pd.DataFrame:
+    """Функция получения операций за период"""
     df = get_read_xlsx('data/operations.xlsx')
     date_start = datetime.strptime(date_end, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-01 00:00:00")
     df["Дата операции"] = pd.to_datetime(df["Дата операции"], dayfirst=True)
@@ -138,12 +139,10 @@ def get_currency_rates(date:str) -> list[dict]:
     return rates
 
 
-def get_stock_rates(date:str) -> list[dict]:
-    """Функция принимает дату и выдает курс акций который есть в документе user_setting.json"""
+def get_stock_rates() -> list[dict]:
+    """Функция выдает курс акций который есть в документе user_setting.json на текущую дату"""
     with open('data/user_settings.json', 'r') as file:
         user_data = json.load(file)
-    date_obj = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
-    formatted_date = date_obj.strftime("%Y-%m-%d")
     rates = []
     for data in user_data.get("user_stocks"):
         url = f"https://www.alphavantage.co/query"
@@ -170,3 +169,17 @@ def get_stock_rates(date:str) -> list[dict]:
             print("Проблема")
     return rates
 
+
+def get_search_transaction_individual(df: pd.DataFrame) -> list[dict]:
+    """Функция возвращает список имен кому был совершен перевод"""
+    filter_operations = df[(df["Статус"] == "OK") & (df["Категория"] == "Переводы")]
+    pattern = r'[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.'
+    result_filter = filter_operations[filter_operations["Описание"].str.contains(pattern, regex=True)]
+    names = result_filter['Описание'].tolist()
+    unique_names = list(set(names))
+    result_list = []
+    result_dict = {
+        'transfers': unique_names
+    }
+    result_list.append(result_dict)
+    return result_list
