@@ -1,12 +1,10 @@
 from datetime import datetime, time
 
-
 import pandas as pd
 import os
 from dotenv import load_dotenv
 import requests
 import json
-
 
 load_dotenv()
 
@@ -25,9 +23,12 @@ def get_read_xlsx(path: str) -> pd.DataFrame:
 
 def determining_time_day(date_time: str) -> str:
     """Функция преобразовывает введенную дату в datatime и выводит приветствие в зависимости от времени суток"""
-    dt = datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S')
-    date = dt
-    time_date = date.time()
+    try:
+        dt = datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S')
+        date = dt
+        time_date = date.time()
+    except ValueError:
+        return 'Ошибка: неверный формат даты. Используйте формат YYYY-MM-DD HH:MM:SS.'
 
     night_start = time(00, 0)
     night_end = time(6,0)
@@ -47,6 +48,7 @@ def determining_time_day(date_time: str) -> str:
     elif evening_start <= time_date <= evening_end:
         return 'Добрый вечер'
 
+    return 'Ошибка: время не распознано.'
 
 def get_operations_with_range(date_end:str) -> pd.DataFrame:
     """Функция получения операций за период"""
