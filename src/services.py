@@ -14,5 +14,5 @@ def get_search_transaction_individual(df: pd.DataFrame) -> str:
         'transfers': unique_names
     }
     result_list.append(result_dict)
-    json_string = json.dumps(result_list, ensure_ascii=False)
+    json_string = json.dumps(result_list, ensure_ascii=False, indent=4)
     return json_string
