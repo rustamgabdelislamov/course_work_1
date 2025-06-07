@@ -6,14 +6,14 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 
-def save_to_file(data: pd.DataFrame, file_path: str) -> None:
+def save_to_file(data: pd.DataFrame, file_path: str) -> str:
     """Сохранение данных по указанному пути"""
     data_dict = data.to_dict(orient='records')
     try:
         with open(file_path, 'w', encoding='utf-8') as data_file:
             json.dump(data_dict, data_file, ensure_ascii=False, indent=4)
     except Exception as ex:
-        []
+        return []
 
 
 def writing_to_file(func):
@@ -27,7 +27,7 @@ def writing_to_file(func):
             file_path = f'logs/{file_name}'
             save_to_file(result, file_path)
         except Exception as ex:
-            []
+            return []
 
     return wrapper
 
@@ -56,9 +56,3 @@ def spending_by_category(transactions: pd.DataFrame,
     & (transactions["Категория"] != "Переводы") & (transactions["Категория"] == category)]
     operation_group = filter_operations[["Категория", "Сумма платежа"]].groupby("Категория").sum().reset_index()
     return operation_group
-
-
-
-
-
-
