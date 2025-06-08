@@ -1,7 +1,7 @@
 from datetime import datetime
 from unittest.mock import patch
 import pandas as pd
-from src.reports import get_operations_with_range_3_month, writing_to_file
+from src.reports import get_operations_with_range_3_month, writing_to_file, spending_by_category
 from src.utils import get_read_xlsx
 import os
 
@@ -35,48 +35,66 @@ def test_get_operations_with_range_3(mock_get_read_xlsx):
     assert result.reset_index(drop=True).equals(expected.reset_index(drop=True))
 
 
-@writing_to_file
-def get_data():
-    """Эта фиктивная функция будет возвращать DataFrame,который ожидает декоратор writing_to_file."""
-    return pd.DataFrame({"Категория": ["Еда"], "Сумма": [100.0]})
+def create_mock_dataframe():
+    return pd.DataFrame({
+        "Категория": ["Еда"],
+        "Сумма": [100.0]
+    })
 
 
 # Патчим datetime.today() и save_to_file в модуле, где они используются декоратором.
-# Предполагаем, что это src.decorators
 @patch('src.reports.datetime')
 @patch('src.reports.save_to_file')
 def test_writing_to_file_corrected(mock_save_to_file, mock_datetime):
     """Тест на успешное выполнение декоратора writing_to_file"""
     # 1. Мокируем datetime.today() для предсказуемой даты
-    # Устанавливаем ту же дату, что и в вашем выводе ошибки, для ясности.
     fixed_date = datetime(2025, 6, 7)
     mock_datetime.today.return_value = fixed_date
-    # 2. Вызываем декорированную функцию
-    # get_data теперь возвращает DataFrame, который ожидает декоратор.
-    # Декоратор не возвращает результат декорируемой функции (нет 'return result'),
-    # поэтому ожидаем None в случае успеха.
-    result_from_decorator = get_data()
 
-    # 3. Проверяем, что декоратор успешно выполнился (вернул None)
-    assert result_from_decorator is None
+    # 2. Создаем мокированную функцию, которую будем декорировать.
+    #    В реальном коде это была бы ваша spending_by_category.
+    @writing_to_file  # Предполагаем, что writing_to_file импортирован
+    def mock_decorated_function():
+        return create_mock_dataframe()
 
-    # 4. Проверяем, что mock_save_to_file был вызван ровно один раз
+    # 3. Вызываем декорированную функцию
+    result_from_decorator = mock_decorated_function()
+
+    # 4. Проверяем, что декоратор успешно выполнился и вернул DataFrame
+    expected_df = create_mock_dataframe()  # Получаем ожидаемый DataFrame
+    pd.testing.assert_frame_equal(result_from_decorator, expected_df) #это функция из библиотеки pandas,
+    # предназначенная для сравнения двух DataFrame и выдачи информативного сообщения об ошибке, если они не идентичны
+
+    # 5. Проверяем, что mock_save_to_file был вызван ровно один раз
     mock_save_to_file.assert_called_once()
 
-    # 5. Проверяем аргументы, с которыми был вызван mock_save_to_file
-    # mock_save_to_file.call_args возвращает кортеж ((args), {kwargs})
-    called_data, called_file_path = mock_save_to_file.call_args[0] # args[0] это первый позиционный аргумент, args[1] второй
+    # 6. Проверяем аргументы, с которыми был вызван mock_save_to_file
+    called_data, called_file_path = mock_save_to_file.call_args[0] #Аргументы с которой вызывается функция
+    # save_to_file
 
     # Проверяем DataFrame, который был передан save_to_file
-    expected_df_to_save = pd.DataFrame({
-        "Категория": ["Еда"],
-        "Сумма": [100.0]
-    })
+    expected_df_to_save = create_mock_dataframe()
     pd.testing.assert_frame_equal(called_data, expected_df_to_save)
 
     # Проверяем ожидаемое имя файла и путь
-    expected_category = expected_df_to_save["Категория"].values[0] # "Еда"
+    expected_category = expected_df_to_save["Категория"].values[0]  # "Еда"
     expected_file_name = f'{fixed_date.strftime("%Y-%m-%d")}_{expected_category}.json'
-    expected_file_path = f'logs/{expected_file_name}'
-
+    expected_file_path = os.path.join('logs', expected_file_name)  # Используем os.path.join
+    expected_file_path = os.path.normpath(expected_file_path)  # Нормализуем путь
+    called_file_path = os.path.normpath(called_file_path)  # Нормализуем путь, который вернула функция
     assert called_file_path == expected_file_path
+
+
+@patch('src.reports.get_operations_with_range_3_month')
+def test_spending_by_category_date(mock_get_operations_with_range_3_month,sample_data):
+    """Тестируем без указания даты"""
+    mock_get_operations_with_range_3_month.return_value = sample_data
+    result = spending_by_category(sample_data, "Пополнения", '2025-06-21 12:12:12')
+    result_dict = result.to_dict(orient='records')
+    expected = [{"Категория": "Пополнения", "Сумма платежа": 350.0}]
+    assert result_dict == expected
+
+
+
+
+

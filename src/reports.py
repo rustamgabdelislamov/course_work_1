@@ -26,6 +26,9 @@ def writing_to_file(func):
             file_name = f'{today_string}_{result["Категория"].values[0]}.json'
             file_path = f'logs/{file_name}'
             save_to_file(result, file_path)
+            print(type(result))
+            print(result)
+            return result
         except Exception as ex:
             return []
 
@@ -53,7 +56,6 @@ def spending_by_category(transactions: pd.DataFrame,
         transactions = get_operations_with_range_3_month(date_now)
     else:
         transactions = get_operations_with_range_3_month(date)
-    filter_operations = transactions[(transactions["Статус"] == "OK") & (transactions["Категория"] != "Пополнения")
-    & (transactions["Категория"] != "Переводы") & (transactions["Категория"] == category)]
+    filter_operations = transactions[(transactions["Статус"] == "OK") & (transactions["Категория"] == category)]
     operation_group = filter_operations[["Категория", "Сумма платежа"]].groupby("Категория").sum().reset_index()
     return operation_group
