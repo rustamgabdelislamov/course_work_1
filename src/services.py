@@ -1,6 +1,6 @@
 import pandas as pd
-import re
 import json
+
 
 def get_search_transaction_individual(df: pd.DataFrame) -> str:
     """Функция возвращает список имен кому был совершен перевод"""

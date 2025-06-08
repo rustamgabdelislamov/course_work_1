@@ -1,11 +1,18 @@
-from datetime import datetime, time
+from datetime import datetime
 
 import pandas as pd
 import os
 from dotenv import load_dotenv
 import requests
 import json
+import logging
 
+logger = logging.getLogger('utils')
+logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler('logs/utils.log', mode='w', encoding='utf-8')
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
 load_dotenv()
 
 API_KEY = os.getenv('API_KEY')
@@ -14,66 +21,58 @@ API_KEY_ALPHAVANTAGE = os.getenv('API_KEY_ALPHAVANTAGE')
 
 def get_read_xlsx(path: str) -> pd.DataFrame:
     """Функция принимает путь к excel файлу и преобразует в dataFrame"""
+    logger.info(f"открываем файл по пути{path}")
     if not os.path.isfile(path):
+        logger.error(f"ошибка не найден файл по данному пути{path}")
         raise FileNotFoundError(f"Файл не найден: {path}")
-
-
     try:
         df = pd.read_excel(path)
+        logger.info(f"открыли файл по данному пути{path}")
         if df.empty:
+            logger.error(f"Файл пуст или поврежден {path}")
             raise ValueError(f"Файл пуст или поврежден: {path}")
         return df
 
     except ValueError as e:
-        # logging.error(f"Ошибка при чтении файла {path}: {e}")
+        logging.error(f"Ошибка при чтении файла {path}: {e}")
         raise ValueError(f"Файл пуст: {path}")
 
 
-def determining_time_day(date_time: str) -> str:
-    """Функция преобразовывает введенную дату в datatime и выводит приветствие в зависимости от времени суток"""
-    try:
-        dt = datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S')
-        date = dt
-        time_date = date.time()
-    except ValueError:
-        return 'Ошибка: неверный формат даты. Используйте формат YYYY-MM-DD HH:MM:SS.'
-
-    night_start = time(00, 0)
-    night_end = time(6,0)
-    morning_start = time(6, 1)
-    morning_end = time(12, 0)
-    day_start = time(12,1)
-    day_end = time(18,0)
-    evening_start = time(18,1)
-    evening_end = time(23,59)
-
-    if night_start <= time_date <= night_end:
-        return 'Доброй ночи'
-    elif morning_start <= time_date <= morning_end:
-        return 'Доброе утро'
-    elif day_start <= time_date <= day_end:
-        return 'Добрый день'
-    elif evening_start <= time_date <= evening_end:
-        return 'Добрый вечер'
+def determining_time_day() -> str:
+    """Функция выводит приветствие в зависимости от времени суток"""
+    now = datetime.now()
+    hour = now.hour
+    logger.info("сравниваем текущую дату с условиями")
+    if 6 <= hour < 12:
+        return "Доброе утро"
+    elif 12 <= hour < 18:
+        return "Добрый день"
+    elif 18 <= hour < 24:
+        return "Добрый вечер"
+    else:
+        return "Доброй ночи"
 
 
-def get_operations_with_range(date_end:str) -> pd.DataFrame | str:
+def get_operations_with_range(date_end: str) -> pd.DataFrame | str:
     """Функция получения операций за период"""
     df = get_read_xlsx('data/operations.xlsx')
-
+    logger.info("открываем файл через get_read_xlsx")
     date_start = datetime.strptime(date_end, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-01 00:00:00")
-    df["Дата операции"] = pd.to_datetime(df["Дата операции"],dayfirst=True)
+    df["Дата операции"] = pd.to_datetime(df["Дата операции"], dayfirst=True)
+    logger.info("сортируем даты операции по дате и со статусом ок")
     filter_operations = df[
         (df["Дата операции"] >= date_start) &
         (df["Дата операции"] <= date_end) &
         (df["Статус"] == "OK")
     ].copy()
+    logger.info("произошла сортировка")
 
     if filter_operations.empty:
+        logger.info("Данных транзакций за период не найдено")
         return "Данных транзакций за период не найдено"
-
+    logger.info("Замена даты из формата datatime в формат строки")
     filter_operations["Дата операции"] = filter_operations["Дата операции"].dt.strftime("%d.%m.%Y")
-
+    logger.info("возврат отфильтрованных данных")
     return filter_operations
 
 
@@ -82,24 +81,27 @@ def cards_and_transactions(df: pd.DataFrame) -> list[dict] | str:
     filter_operations = df[(df["Статус"] == "OK") & (df["Категория"] != "Пополнения")]
 
     if filter_operations.empty:
+        logger.info("Данных транзакций за период не найдено")
         return "Данных транзакций за период не найдено"
-
+    logger.info("группировка по номеру карты")
     operation_group = filter_operations[["Номер карты", "Сумма платежа"]].groupby("Номер карты").sum().reset_index()
+    logger.info("перевод в словарь")
     operations = operation_group.to_dict(orient='records')
 
     result_cards = []
-
+    logger.info("начинаем цикл")
     for operation in operations:
         last_digits = operation.get("Номер карты")[1:]
         total_spent = round(operation.get("Сумма платежа"), 2)
         cashback = abs(round(total_spent * 0.01, 2))
+        logger.info("Получение результата")
         result = {
             "last_digits": last_digits,
             "total_spent": total_spent,
             "cashback": cashback
         }
         result_cards.append(result)
-
+    logger.info("Возврат результата")
     return result_cards
 
 
@@ -122,7 +124,7 @@ def descriptions_and_transactions(df: pd.DataFrame) -> list[dict] | str:
             result_descriptions.append({
                 'date': date,
                 'amount': amount,
-                'category':category,
+                'category': category,
                 'description': description
             })
 
@@ -131,16 +133,17 @@ def descriptions_and_transactions(df: pd.DataFrame) -> list[dict] | str:
 
 
 def read_user_settings(file_path):
+    """Функция чтения json"""
     try:
         with open(file_path, 'r') as file:
             return json.load(file)
     except FileNotFoundError:
         raise FileNotFoundError(f'Файл {file_path} не найден.')
     except json.JSONDecodeError:
-        raise ValueError(f'Ошибка при чтении JSON файла.')
+        raise ValueError('Ошибка при чтении JSON файла.')
 
 
-def get_currency_rates(date:str) -> list[dict] | str:
+def get_currency_rates(date: str) -> list[dict] | str:
     """Функция принимает дату и выдает курс который есть в документе user_setting.json"""
     user_data = read_user_settings('data/user_settings.json')
     date_obj = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
@@ -183,7 +186,7 @@ def get_currency_rates(date:str) -> list[dict] | str:
                 return 'Проблема с сетью или сервером'
 
         except requests.exceptions.RequestException as e:
-            print("Проблема c ответом от сервера")
+            print(f"Проблема c ответом от сервера {e}")
 
     return rates
 
@@ -193,7 +196,7 @@ def get_stock_rates() -> list[dict] | str:
     rates = []
     user_data = read_user_settings('data/user_settings.json')
     for data in user_data.get("user_stocks"):
-        url = f"https://www.alphavantage.co/query"
+        url = "https://www.alphavantage.co/query"
         params = {
             "function": "GLOBAL_QUOTE",
             "symbol": data,
@@ -211,7 +214,7 @@ def get_stock_rates() -> list[dict] | str:
                 if global_quote:
                     result_dict = {
                         "stock": data,
-                        "price": result.get("Global Quote",{}).get("05. price",{})
+                        "price": result.get("Global Quote", {}).get("05. price", {})
                     }
                     rates.append(result_dict)
                 else:

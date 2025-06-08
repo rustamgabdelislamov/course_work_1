@@ -2,8 +2,9 @@ from datetime import datetime
 from unittest.mock import patch
 import pandas as pd
 from src.reports import get_operations_with_range_3_month, writing_to_file, spending_by_category
-from src.utils import get_read_xlsx
+
 import os
+
 
 @patch('src.reports.get_read_xlsx')
 def test_get_operations_with_range_3(mock_get_read_xlsx):
@@ -62,14 +63,15 @@ def test_writing_to_file_corrected(mock_save_to_file, mock_datetime):
 
     # 4. Проверяем, что декоратор успешно выполнился и вернул DataFrame
     expected_df = create_mock_dataframe()  # Получаем ожидаемый DataFrame
-    pd.testing.assert_frame_equal(result_from_decorator, expected_df) #это функция из библиотеки pandas,
-    # предназначенная для сравнения двух DataFrame и выдачи информативного сообщения об ошибке, если они не идентичны
+    pd.testing.assert_frame_equal(result_from_decorator, expected_df)  # это функция из библиотеки pandas,
+    # предназначенная для сравнения двух DataFrame и выдачи информативного сообщения об ошибке,
+    # если они не идентичны
 
     # 5. Проверяем, что mock_save_to_file был вызван ровно один раз
     mock_save_to_file.assert_called_once()
 
     # 6. Проверяем аргументы, с которыми был вызван mock_save_to_file
-    called_data, called_file_path = mock_save_to_file.call_args[0] #Аргументы с которой вызывается функция
+    called_data, called_file_path = mock_save_to_file.call_args[0]  # Аргументы с которой вызывается функция
     # save_to_file
 
     # Проверяем DataFrame, который был передан save_to_file
@@ -86,15 +88,10 @@ def test_writing_to_file_corrected(mock_save_to_file, mock_datetime):
 
 
 @patch('src.reports.get_operations_with_range_3_month')
-def test_spending_by_category_date(mock_get_operations_with_range_3_month,sample_data):
+def test_spending_by_category_date(mock_get_operations_with_range_3_month, sample_data):
     """Тестируем без указания даты"""
     mock_get_operations_with_range_3_month.return_value = sample_data
     result = spending_by_category(sample_data, "Пополнения", '2025-06-21 12:12:12')
     result_dict = result.to_dict(orient='records')
     expected = [{"Категория": "Пополнения", "Сумма платежа": 350.0}]
     assert result_dict == expected
-
-
-
-
-
