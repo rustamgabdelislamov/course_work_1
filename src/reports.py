@@ -39,7 +39,7 @@ def writing_to_file(func):
             file_path = f'logs/{file_name}'
             logger.info("путь файла")
             save_to_file(result, file_path)
-            logger.info("записали рузультат")
+            logger.info("записали результат")
             return result
         except Exception as ex:
             logger.error(f'Ошибка, что-то не так с путем или dataframe {ex}')
