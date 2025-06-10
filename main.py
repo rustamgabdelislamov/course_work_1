@@ -36,7 +36,7 @@ if __name__ == '__main__':
             df_3 = get_operations_with_range_3_month(input_date_3)
             get_operations_with_range_3_month(input_date_3)
             input_category = input('Введите категорию для поиска')
-            print(spending_by_category(df_3,input_category, input_date_3))
+            print(spending_by_category(df_3, input_category, input_date_3))
         else:
             print("Некорректный пункт меню. Пожалуйста, выберите 1, 2 или 3.")
 
@@ -49,6 +49,3 @@ if __name__ == '__main__':
                 exit()
             else:
                 print("Пожалуйста, введите 'да' или 'нет'.")
-
-
-
