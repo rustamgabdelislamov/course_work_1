@@ -5,13 +5,13 @@ from src.utils import determining_time_day, cards_and_transactions, descriptions
 
 
 def get_json_answer(data_time: str) -> str:
-    path = 'data/operations.xlsx'
-    greeting = determining_time_day(data_time)
+    """Функция принимает дату и возвращает json ответ"""
+    greeting = determining_time_day()
     transactions = get_operations_with_range(data_time)
     cards = cards_and_transactions(transactions)
     top_transactions = descriptions_and_transactions(transactions)
     currency_rates = get_currency_rates(data_time)
-    stock_prices = get_stock_rates(data_time)
+    stock_prices = get_stock_rates()
     result = {
         "greeting": greeting,
         "cards": cards,
@@ -21,4 +21,3 @@ def get_json_answer(data_time: str) -> str:
     }
     json_string = json.dumps(result, ensure_ascii=False)
     return json_string
-
